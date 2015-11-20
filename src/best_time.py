@@ -21,6 +21,9 @@ def main(inputPath, outputPath):
     sc = SparkContext(conf=conf)
 
     text = sc.textFile(inputPath)
+    
+    #repartition, hopefully, we work this better?
+    text = text.repartition(100)
 
     # each: a dict representing a json object
     loadedJson = text.map(lambda line: json.loads(line)).cache()
