@@ -11,7 +11,7 @@ def main(inputPath, outputPath):
     conf = SparkConf().setAppName('check reddit structure')
     sc = SparkContext(conf=conf)
 
-    first_text = sc.textFile(inputPath).first()
+    first_text = sc.textFile(inputPath)
     
     #repartition, hopefully, we work this better?
     #text = text.repartition(100)

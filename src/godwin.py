@@ -1,5 +1,7 @@
-from pyspark import SparkConf, SparkContext
-import sys, json, datetime, re
+from pyspark import SparkConf, SparkContext, SQLContext
+from pyspark.sql.types import StructType, StructField, StringType
+import sys, json, re
+
 
 def add_tuples(a, b):
     return tuple(sum(p) for p in zip(a, b))
@@ -15,6 +17,7 @@ def main(argv):
     # spark specific setup
     conf = SparkConf().setAppName('godwin whaaa')
     sc = SparkContext(conf=conf)
+    sqlContext = SQLContext(sc)
     
     # read input
     text = sc.textFile(input_directory)
@@ -24,10 +27,28 @@ def main(argv):
     loadedJson = text.map(lambda line: json.loads(line))
     
     # code from greg for regex to parse lines
-    linere = re.compile("^.*(hitler|nazi|nazis|holocaust|auschwitz).*$")
+    linere = re.compile("^.*(hitler|nazi|nazis|holocaust|auschwitz|dog).*$")
+    
+    # make the json skinnier by removing unwanted stuff
+    fullRedditJson = loadedJson.map(lambda jObj: (jObj['subreddit'], jObj['body'], jObj['name'].encode('ascii', 'ignore'), jObj['parent_id'])).cache()
     
     # now filter out stuff without GODWINS_WORDS "body","id", "subreddit", "parent_id" 
-    filteredJsonList = loadedJson.filter(lambda jsonBody: linere.match(jsonBody['body'].lower())).cache()
+    godwinJsonList = fullRedditJson.filter(lambda (subreddit, body, name, parent_id): linere.match(body.lower())).cache()
+    
+    # Now we convert BOTH filteredJsonList AND loadedJson into sparkSQL
+    subredditSchema = StructType([
+        StructField("subreddit", StringType(), True), 
+        StructField("body", StringType(), True), 
+        StructField("name", StringType(), True), 
+        StructField("parent_id", StringType(), True)
+    ])
+    fullRedditDF = sqlContext.createDataFrame(fullRedditJson, subredditSchema)
+    godwinRedditDF = sqlContext.createDataFrame(godwinJsonList, subredditSchema)
+    
+    # inner join both massive tables together to match up Fist level of ids........
+    firstLevelTest = godwinRedditDF.join(fullRedditDF, [godwinRedditDF.parent_id == fullRedditDF.name], 'inner')
+    firstLevelTest.show(800)
+    
     
 if __name__ == "__main__":
     main(sys.argv[1:]) # [1:] strips out [0]
