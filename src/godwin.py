@@ -9,7 +9,7 @@ def add_tuples(a, b):
 
 def main(argv):
     # list of words to look for!
-    GODWINS_WORDS = {'hitler':True, 'nazi': True, 'natzis':True, 'holocaust':True, 'auschwitz':True}
+    GODWINS_WORDS = {'hitler':True, 'nazi': True, 'nazis':True, 'holocaust':True, 'auschwitz':True}
     
     # setup inputs and outputs
     input_directory = argv[0]
