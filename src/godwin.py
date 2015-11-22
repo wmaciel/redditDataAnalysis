@@ -7,9 +7,19 @@ def add_tuples(a, b):
     return tuple(sum(p) for p in zip(a, b))
 
 
+def regex_from_words(words):
+    """Creates a regular expression string that would match one of the words from the list."""
+    expression = ''
+    # create the core of the expression
+    for w in words:
+        expression += w + '|'
+    # add the endings, while removing the unwanted extra '|'
+    expression  = '^.*(' + expression[0:-1] + ').*$'
+    return expression
+
 def main(argv):
     # list of words to look for!
-    GODWINS_WORDS = {'hitler': True, 'nazi': True, 'nazis': True, 'holocaust': True, 'auschwitz': True}
+    GODWINS_WORDS = ['hitler', 'nazi', 'nazis', 'holocaust', 'auschwitz', 'dog', 'cat']
 
     # setup inputs and outputs
     input_directory = argv[0]
@@ -27,7 +37,7 @@ def main(argv):
     loadedJson = text.map(lambda line: json.loads(line))
 
     # code from greg for regex to parse lines
-    linere = re.compile("^.*(hitler|nazi|nazis|holocaust|auschwitz|dog).*$")
+    linere = re.compile(regex_from_words(GODWINS_WORDS))
 
     # make the json skinnier by removing unwanted stuff
     fullRedditJson = loadedJson.map(lambda jObj: (jObj['subreddit'], jObj['body'], jObj['name'].encode('ascii', 'ignore'), jObj['parent_id'])).cache()
