@@ -36,11 +36,11 @@ def main(argv):
     # convert to magic json formatting
     loadedJson = text.map(lambda line: json.loads(line))
 
-    # code from greg for regex to parse lines
-    linere = re.compile(regex_from_words(GODWINS_WORDS))
-
     # make the json skinnier by removing unwanted stuff
     fullRedditJson = loadedJson.map(lambda jObj: (jObj['subreddit'], jObj['body'], jObj['name'], jObj['parent_id'])).cache()
+
+    # code from greg for regex to parse lines
+    linere = re.compile(regex_from_words(GODWINS_WORDS))
 
     # now filter out stuff without GODWINS_WORDS "body","id", "subreddit", "parent_id" 
     godwinJsonList = fullRedditJson.filter(lambda (subreddit, body, name, parent_id): linere.match(body.lower())).cache()
