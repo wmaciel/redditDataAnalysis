@@ -14,7 +14,7 @@ def regex_from_words(words):
     for w in words:
         expression += w + '|'
     # add the endings, while removing the unwanted extra '|'
-    expression  = '^.*(' + expression[0:-1] + ').*$'
+    expression = '^.*(' + expression[0:-1] + ').*$'
     return expression
 
 def main(argv):
@@ -40,7 +40,7 @@ def main(argv):
     linere = re.compile(regex_from_words(GODWINS_WORDS))
 
     # make the json skinnier by removing unwanted stuff
-    fullRedditJson = loadedJson.map(lambda jObj: (jObj['subreddit'], jObj['body'], jObj['name'].encode('ascii', 'ignore'), jObj['parent_id'])).cache()
+    fullRedditJson = loadedJson.map(lambda jObj: (jObj['subreddit'], jObj['body'], jObj['name'], jObj['parent_id'])).cache()
 
     # now filter out stuff without GODWINS_WORDS "body","id", "subreddit", "parent_id" 
     godwinJsonList = fullRedditJson.filter(lambda (subreddit, body, name, parent_id): linere.match(body.lower())).cache()
