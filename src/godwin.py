@@ -25,9 +25,10 @@ def row_into_node(r):
         top_level = 1
     return name, parent_id, top_level
 
+
 def main(argv):
     # list of words to look for!
-    GODWINS_WORDS = ['hitler', 'nazi', 'nazis', 'holocaust', 'auschwitz', 'dog']
+    GODWINS_WORDS = ['hitler']
 
     # setup inputs and outputs
     input_directory = argv[0]
@@ -39,7 +40,7 @@ def main(argv):
 
     # read input
     text = sc.textFile(input_directory)
-    text = text.repartition(300)
+    text = text.repartition(200)
 
     # convert to magic json formatting
     loadedJson = text.map(lambda line: json.loads(line))
