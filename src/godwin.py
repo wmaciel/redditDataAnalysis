@@ -20,15 +20,22 @@ def regex_from_words(words):
 
 def row_into_node(r):
     body, name, parent_id = r
-    top_level = 0
-    if parent_id.startswith('t3_'):
-        top_level = 1
-    return name, parent_id, top_level
+    return name, parent_id
+
+
+def compute_average_godwin(nodes_per_depth):
+    sum_of_n = 0
+    sum_of_d_x_n = 0
+    for d, n in nodes_per_depth.items():
+        sum_of_n += n
+        sum_of_d_x_n += d * n
+
+    return float(sum_of_d_x_n)/sum_of_n
 
 
 def main(argv):
     # list of words to look for!
-    GODWINS_WORDS = ['hitler']
+    GODWINS_WORDS = ['hitler', 'nazi']
 
     # setup inputs and outputs
     input_directory = argv[0]
@@ -62,28 +69,42 @@ def main(argv):
     # Convert full data RDD into SQL Data Frame
     subredditSchema = StructType([
         StructField("name", StringType(), True),
-        StructField("parent_id", StringType(), True),
-        StructField("top_level", IntegerType(), True)
+        StructField("parent_id", StringType(), True)
     ])
     full_node_df = sqlContext.createDataFrame(full_node_rdd, subredditSchema)
 
     # Convert godwin rows RDD into SQL Data Frame
     godwinSchema = StructType([
         StructField("g_name", StringType(), True),
-        StructField("g_parent_id", StringType(), True),
-        StructField("g_top_level", IntegerType(), True)
+        StructField("g_parent_id", StringType(), True)
     ])
-    godwin_node_df = sqlContext.createDataFrame(godwin_node_rdd, godwinSchema)
+    godwin_node_df = sqlContext.createDataFrame(godwin_node_rdd, godwinSchema).cache()
 
-    # Join find next layer of nodes
-    joined_df = godwin_node_df.join(full_node_df, [godwin_node_df['g_parent_id'] == full_node_df['name']])
+    count_down = godwin_node_df.count()
+    print 'There are', count_down, 'comments with a godwins word'
+    depth = 0
+    nodes_per_depth = {}
+    while count_down > 0:
+        depth += 1
+        # Join find next layer of nodes
+        joined_df = godwin_node_df.join(full_node_df,
+                                        [godwin_node_df['g_parent_id'] == full_node_df['name']])
 
-    # Drop the columns of the older node
-    next_node_df = joined_df.select('name', 'parent_id', 'top_level')
+        # Drop the columns of the older node
+        next_node_df = joined_df.select(
+            joined_df['name'].alias('g_name'),
+            joined_df['parent_id'].alias('g_parent_id')).cache()
 
-    # Count how many nodes are top level
-    top_counter_df = next_node_df.groupBy('top_level').count()
-    counter_row = top_counter_df.where(top_counter_df['top_level'] == 1).select(top_counter_df['count'].alias('counter')).collect()
+        count_up = next_node_df.count()
+        n_nodes = count_down - count_up
+        print 'number of godwin nodes of heignt', depth, '=', n_nodes
+        nodes_per_depth[depth] = n_nodes
+        count_down = count_up
+
+        godwin_node_df = next_node_df
+
+    avg = compute_average_godwin(nodes_per_depth)
+    print 'The average distance to the godwin words is', avg
 
 
 if __name__ == "__main__":
