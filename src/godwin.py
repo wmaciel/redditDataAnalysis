@@ -39,6 +39,7 @@ def main(argv):
 
     # setup inputs and outputs
     input_directory = argv[0]
+    output_directory = argv[1]
 
     # spark specific setup
     conf = SparkConf().setAppName('godwin whaaa')
@@ -84,7 +85,8 @@ def main(argv):
     print 'There are', count_down, 'comments with a godwins word'
     depth = 0
     nodes_per_depth = {}
-    while count_down > 0:
+    while count_down > 0 and depth < 100:
+
         depth += 1
         # Join find next layer of nodes
         joined_df = godwin_node_df.join(full_node_df,
@@ -105,6 +107,10 @@ def main(argv):
 
     avg = compute_average_godwin(nodes_per_depth)
     print 'The average distance to the godwin words is', avg
+
+    fp = open(output_directory + 'average.txt')
+    fp.write(str(avg) + '\n')
+    fp.close()
 
 
 if __name__ == "__main__":
