@@ -8,13 +8,13 @@ def cb_go(author, mail):
     print 'mail:', mail
 
 
+
 def build_img_frame(root):
     img_frame = Frame(root)
 
-    #image = Image.open("resources/alien.jpg")
     photo = PhotoImage(file='resources/upvote2.gif')
     img_lbl = Label(img_frame, image=photo)
-    img_lbl.image = photo
+    img_lbl.image = photo # bug workaround. This line keeps the image alive
     img_lbl.pack(side=BOTTOM)
 
     img_frame.grid(row=0)
