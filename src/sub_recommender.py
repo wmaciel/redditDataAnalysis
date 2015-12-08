@@ -5,6 +5,7 @@ import operator
 from pyspark.mllib.recommendation import *
 import pprint
 import os
+import pickle
 
 
 def regex_from_words(words):
@@ -54,9 +55,6 @@ def do_it(sc, input_directory):
     return rankings_rdd
 
 
-# def list_filter
-
-
 def hash_rating(author_subreddit_rating_rdd, sc):
     sql_context = SQLContext(sc)
 
@@ -90,75 +88,69 @@ def hash_rating(author_subreddit_rating_rdd, sc):
     return aid_rdd, sid_rdd, aid_sid_r_rdd
 
 
-def main(comment_dir, submission_dir, output_dir):
+def main(comment_dir, submission_dir, output_dir, author, n):
     # spark specific setup
     conf = SparkConf().setAppName('Subreddit Recommender')
     sc = SparkContext(conf=conf)
 
+    model = None
     author_id_rdd = None
     subreddit_id_rdd = None
-    translated_rdd = None
 
-    A_ID_SUB_ID_RANK_PFP = output_dir + '/pickles/author_subreddit_rank_rdd'
-    SUBREDDIT_ID_PFP = output_dir + '/pickles/subreddit_id_rdd'
+    MODEL_PFP = output_dir + '/pickles/model'
     AUTHOR_ID_PFP = output_dir + '/pickles/author_id_rdd'
+    SUBREDDIT_ID_PFP = output_dir + '/pickles/subreddit_id_rdd'
 
-    if os.path.isdir(A_ID_SUB_ID_RANK_PFP) and os.path.isdir(SUBREDDIT_ID_PFP) and os.path.isdir(AUTHOR_ID_PFP):
-        print 'There are pickles for that!'
-        print 'Loading...',
+    if os.path.isdir(MODEL_PFP) and os.path.isdir(SUBREDDIT_ID_PFP) and os.path.isdir(AUTHOR_ID_PFP):
+        print 'Loading model...',
+        model = MatrixFactorizationModel.load(sc, MODEL_PFP)
         author_id_rdd = sc.pickleFile(AUTHOR_ID_PFP)
         subreddit_id_rdd = sc.pickleFile(SUBREDDIT_ID_PFP)
-        translated_rdd = sc.pickleFile(A_ID_SUB_ID_RANK_PFP)
         print 'Done!'
     else:
-        print 'Pickles not found :('
+        print 'Model not found :('
         print 'This will take a while...'
 
         # ((author, subreddit), comment_rank)
         comment_rdd = do_it(sc, comment_dir)
-
         # ((author, subreddit), submission_rank)
         submission_rdd = do_it(sc, submission_dir)
-
         # ((author, subreddit),(comment_rank, submission_rank))
         total_rdd = submission_rdd.fullOuterJoin(comment_rdd)
-
         # (author, subreddit, comment_rank + submission_rank)
         sum_rdd = total_rdd.map(combine_join_results).cache()
 
         author_id_rdd, subreddit_id_rdd, translated_rdd = hash_rating(sum_rdd, sc)
 
-        print 'Pickling.',
+        print 'Training...',
+        model = ALS.train(translated_rdd, 1)
+        print 'Saving...',
+        model.save(sc, MODEL_PFP)
         author_id_rdd.saveAsPickleFile(AUTHOR_ID_PFP)
-        print '.',
         subreddit_id_rdd.saveAsPickleFile(SUBREDDIT_ID_PFP)
-        print '.',
-        translated_rdd.saveAsPickleFile(A_ID_SUB_ID_RANK_PFP)
         print 'Done!'
 
-    model = ALS.train(translated_rdd, 1)
+    print 'Getting recommendations...'
 
-    wanted_author_id = 100
+    wanted_author_id = author_id_rdd.filter(lambda (a, a_id): str(a) == str(author)).collect()
+    wanted_author_id = int(wanted_author_id[0][1])
 
-    products_ratings = model.recommendProducts(100, 10)
+    products_ratings = model.recommendProducts(wanted_author_id, int(n))
 
     wanted_subreddit_ids = map(lambda x: x.product, products_ratings)
-    wanted_subredits = subreddit_id_rdd.filter(lambda (s, id): id in wanted_subreddit_ids).collect()
-    wanted_subredits = map(lambda (s, id): str(s), wanted_subredits)
+    wanted_subredits = subreddit_id_rdd.filter(lambda (sub, s_id): s_id in wanted_subreddit_ids).collect()
+    wanted_subredits = map(lambda (sub, s_id): sub, wanted_subredits)
 
-    wanted_author = author_id_rdd.filter(lambda (a, id): id == wanted_author_id).collect()
-    wanted_author = str(wanted_author[0])
-
-    print 'author:', str(wanted_author[0])
+    print 'author:', author
     print 'Recommended subreddits:'
     print wanted_subredits
 
     fp_out = open(output_dir + '/recommendation.txt', 'w')
-    fp_out.write('Recommendations for /u/' + str(wanted_author) + ':\n')
+    fp_out.write('Recommendations for /u/' + author + ':\n')
     for i, s in enumerate(wanted_subredits):
         fp_out.write(str(i) + ': /r/' + str(s) + '\n')
     fp_out.close()
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2], sys.argv[3])
+    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
